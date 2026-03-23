@@ -23,6 +23,7 @@ from storage.state_store import StateStore
 # Shared singletons
 # ---------------------------------------------------------------------------
 index_store = IndexStore()
+index_store.load_from_disk()
 state_store = StateStore()
 search_engine = SearchEngine(index_store)
 
