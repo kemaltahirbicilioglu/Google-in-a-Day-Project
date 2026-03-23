@@ -44,7 +44,9 @@ class SearchEngine:
         df_map = {w: self._index.document_frequency(w) for w in words}
 
         raw_entries = self._index.search(words)
-        scored = self._score_and_dedup(raw_entries, words, total_docs, df_map)
+        scored = self._score_and_dedup(
+            raw_entries, words, total_docs, df_map, self._index,
+        )
         scored.sort(key=lambda r: r["score"], reverse=True)
 
         total = len(scored)
@@ -71,21 +73,32 @@ class SearchEngine:
         query_words: list[str],
         total_docs: int,
         df_map: dict[str, int],
+        index_store: IndexStore,
     ) -> list[dict[str, Any]]:
-        """Score entries using TF-IDF and deduplicate by relevant_url.
+        """Score entries with length-normalized TF-IDF and deduplicate.
 
-        Scoring:
-            TF  = 1 + log10(frequency)          (log-scaled term frequency)
-            IDF = log10(total_docs / df)         (inverse document frequency)
-            score = TF * IDF                     (per query term, summed)
-                  + exact match bonus (1.0)
-                  - depth penalty (depth * 0.1)
+        Scoring per matching word in a document:
+            TF_norm  = frequency / doc_total_words  (length-normalized)
+            IDF      = log10(total_docs / df)
+            base     = TF_norm * IDF * 1000         (scaled for readability)
+
+        Exact query match gets full base score; prefix-only match is
+        discounted to 30% so pages *about* the exact term rank higher.
+
+        Per-document: scores from all matched words are summed, then:
+            final = sum_of_scores + exact_match_bonus (2.0) - depth * 0.05
         """
-        best: dict[str, dict[str, Any]] = {}
         query_set = set(query_words)
 
+        url_scores: dict[str, float] = {}
+        url_has_exact: dict[str, bool] = {}
+        url_meta: dict[str, dict[str, Any]] = {}
+
         for entry in entries:
-            tf = 1 + math.log10(max(entry.frequency, 1))
+            url = entry.relevant_url
+            doc_size = index_store.get_doc_size(url)
+
+            tf_norm = entry.frequency / doc_size
 
             df = df_map.get(entry.word, 1)
             for qw in query_words:
@@ -94,22 +107,29 @@ class SearchEngine:
                     break
             idf = math.log10(total_docs / max(df, 1))
 
-            tfidf = tf * idf
+            base = tf_norm * idf * 1000.0
 
             exact = entry.word in query_set
-            bonus = 1.0 if exact else 0.0
-            penalty = entry.depth * 0.1
+            word_score = base if exact else base * 0.3
 
-            score = round(tfidf + bonus - penalty, 4)
-            score = max(score, 0.0)
+            url_scores[url] = url_scores.get(url, 0.0) + word_score
 
-            url = entry.relevant_url
-            if url not in best or score > best[url]["score"]:
-                best[url] = {
-                    "relevant_url": entry.relevant_url,
+            if exact:
+                url_has_exact[url] = True
+
+            if url not in url_meta or entry.depth < url_meta[url]["depth"]:
+                url_meta[url] = {
+                    "relevant_url": url,
                     "origin_url": entry.origin_url,
                     "depth": entry.depth,
-                    "score": score,
                 }
 
-        return list(best.values())
+        results: list[dict[str, Any]] = []
+        for url, raw_score in url_scores.items():
+            meta = url_meta[url]
+            exact_bonus = 2.0 if url_has_exact.get(url, False) else 0.0
+            depth_penalty = meta["depth"] * 0.05
+            score = round(max(raw_score + exact_bonus - depth_penalty, 0.0), 4)
+            results.append({**meta, "score": score})
+
+        return results

@@ -29,7 +29,9 @@ class IndexStore:
         self._storage_dir = storage_dir
         self._lock = threading.RLock()
         self._index: dict[str, list[IndexEntry]] = {}
+        self._doc_sizes: dict[str, int] = {}  # url -> total word count
         self._dirty_letters: set[str] = set()
+        self._dirty_doc_sizes = False
         self._total_entries = 0
         os.makedirs(self._storage_dir, exist_ok=True)
 
@@ -53,6 +55,10 @@ class IndexStore:
             depth: Hop distance from the origin.
         """
         with self._lock:
+            total_words = sum(word_frequencies.values())
+            self._doc_sizes[page_url] = max(total_words, 1)
+            self._dirty_doc_sizes = True
+
             for word, freq in word_frequencies.items():
                 if len(word) < 2:
                     continue
@@ -84,24 +90,40 @@ class IndexStore:
                             results.extend(entries)
         return results
 
+    def get_doc_size(self, url: str) -> int:
+        """Return total word count for a document, or 1 if unknown."""
+        with self._lock:
+            return self._doc_sizes.get(url, 1)
+
     def flush_to_disk(self) -> None:
-        """Write all dirty shards to disk."""
+        """Write all dirty shards and doc sizes to disk."""
         with self._lock:
             dirty = set(self._dirty_letters)
             self._dirty_letters.clear()
+            flush_sizes = self._dirty_doc_sizes
+            self._dirty_doc_sizes = False
 
         for letter in dirty:
             self._write_shard(letter)
+
+        if flush_sizes:
+            self._write_doc_sizes()
 
     def load_from_disk(self) -> None:
         """Reload the full index from disk files into memory."""
         with self._lock:
             self._index.clear()
+            self._doc_sizes.clear()
             self._total_entries = 0
             if not os.path.isdir(self._storage_dir):
                 return
             for fname in os.listdir(self._storage_dir):
                 if not fname.endswith(".data"):
+                    continue
+                if fname == "doc_sizes.data":
+                    self._read_doc_sizes(
+                        os.path.join(self._storage_dir, fname)
+                    )
                     continue
                 path = os.path.join(self._storage_dir, fname)
                 self._read_shard(path)
@@ -185,5 +207,32 @@ class IndexStore:
                         continue
                     self._index.setdefault(word, []).append(entry)
                     self._total_entries += 1
+        except OSError:
+            pass
+
+    def _write_doc_sizes(self) -> None:
+        """Persist document word counts to disk."""
+        with self._lock:
+            snapshot = dict(self._doc_sizes)
+        path = os.path.join(self._storage_dir, "doc_sizes.data")
+        with open(path, "w", encoding="utf-8") as f:
+            for url, size in snapshot.items():
+                f.write(f"{url}\t{size}\n")
+
+    def _read_doc_sizes(self, path: str) -> None:
+        """Load document word counts from disk. Caller must hold _lock."""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if not line:
+                        continue
+                    parts = line.split("\t")
+                    if len(parts) != 2:
+                        continue
+                    try:
+                        self._doc_sizes[parts[0]] = int(parts[1])
+                    except ValueError:
+                        continue
         except OSError:
             pass

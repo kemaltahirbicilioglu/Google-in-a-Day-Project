@@ -250,18 +250,25 @@ On resume (`POST /resume/{crawler_id}`):
 
 ## 9. Search Relevance
 
-Scoring uses TF-IDF (Term Frequency -- Inverse Document Frequency):
+Scoring uses length-normalized TF-IDF (Term Frequency -- Inverse Document Frequency):
 ```
-TF    = 1 + log10(frequency)
-IDF   = log10(total_docs / doc_frequency)
-score = TF * IDF + exact_match_bonus (1.0) - depth_penalty (depth * 0.1)
+TF_norm = frequency / total_words_in_document   (length-normalized)
+IDF     = log10(total_docs / doc_frequency)
+base    = TF_norm * IDF * 1000                   (scaled for readability)
+
+exact match:  score += base
+prefix match: score += base * 0.3
+
+final = sum_of_word_scores + exact_match_bonus (2.0) - depth_penalty (depth * 0.05)
 ```
 
-- **TF (Term Frequency):** Log-scaled word count on the page — diminishing returns for very high counts.
+- **TF (Term Frequency):** Normalized by document length — a page where 5% of words are "queue" scores higher than one where 0.1% are, regardless of raw count.
 - **IDF (Inverse Document Frequency):** Words that appear in fewer documents are more distinctive and score higher.
-- **Exact match bonus:** +1.0 when the indexed word exactly matches a query word.
-- **Depth penalty:** Pages closer to the origin rank slightly higher (-0.1 per depth level).
-- **Deduplication:** Results grouped by `relevant_url`, keeping highest score.
+- **Exact vs prefix:** Exact query-word matches receive the full TF-IDF score; prefix matches (e.g. "queues" matching query "queue") are discounted to 30%.
+- **Exact match bonus:** +2.0 when at least one indexed word exactly matches a query word.
+- **Depth penalty:** Pages closer to the origin rank slightly higher (-0.05 per depth level).
+- **Aggregation:** All matching words' scores for a document are **summed**, so a page mentioning the term many ways accumulates score.
+- **Deduplication:** Results grouped by `relevant_url`, using best metadata.
 - **Prefix matching:** For query terms ≥ 3 characters, indexed words starting with the query term are also matched.
 
 ## 10. UI Requirements
