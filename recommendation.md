@@ -1,5 +1,7 @@
 # Recommendations for Production Deployment
 
+**Project Repository:** [https://github.com/kemaltahirbicilioglu/Google-in-a-Day-Project](https://github.com/kemaltahirbicilioglu/Google-in-a-Day-Project)
+
 ## Future
 
 For the future, there are many things that can be improved and changed to make this system production-ready. Below are my thoughts on the most important areas.
