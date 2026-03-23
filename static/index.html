@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google-in-a-Day</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <header>
+    <h1>Google-in-a-Day</h1>
+    <p class="subtitle">Web Crawler &amp; Search Engine</p>
+    <nav>
+      <button class="tab active" data-tab="crawler">Crawler</button>
+      <button class="tab" data-tab="status">Status</button>
+      <button class="tab" data-tab="search">Search</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ==================== CRAWLER TAB ==================== -->
+    <section id="tab-crawler" class="tab-content active">
+      <div class="card">
+        <h2>Start a New Crawl</h2>
+        <form id="crawl-form">
+          <div class="form-row">
+            <label for="origin">Origin URL</label>
+            <input type="url" id="origin" placeholder="https://example.com" required>
+          </div>
+          <div class="form-row">
+            <label for="depth">Max Depth (k)</label>
+            <input type="number" id="depth" value="2" min="1" max="1000" required>
+          </div>
+
+          <details>
+            <summary>Advanced Options</summary>
+            <div class="form-row">
+              <label for="max-workers">Workers</label>
+              <input type="number" id="max-workers" value="4" min="1" max="32">
+            </div>
+            <div class="form-row">
+              <label for="hit-rate">Hit Rate (req/s)</label>
+              <input type="number" id="hit-rate" value="2" min="0.1" max="100" step="0.1">
+            </div>
+            <div class="form-row">
+              <label for="max-queue">Queue Capacity</label>
+              <input type="number" id="max-queue" value="10000" min="100" max="100000">
+            </div>
+            <div class="form-row">
+              <label for="max-pages">Max Pages</label>
+              <input type="number" id="max-pages" value="500" min="0" max="50000">
+            </div>
+          </details>
+
+          <button type="submit" class="btn-primary">Start Crawl</button>
+        </form>
+        <div id="crawl-result" class="msg" hidden></div>
+      </div>
+
+      <div class="card">
+        <h2>Crawler History</h2>
+        <div id="crawler-list" class="crawler-list">
+          <p class="muted">No crawlers yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== STATUS TAB ==================== -->
+    <section id="tab-status" class="tab-content">
+      <div class="card">
+        <h2>System Overview</h2>
+        <div id="global-stats" class="stats-row">
+          <div class="stat"><span id="stat-pages">0</span><small>Pages Indexed</small></div>
+          <div class="stat"><span id="stat-words">0</span><small>Unique Words</small></div>
+          <div class="stat"><span id="stat-crawlers">0</span><small>Active Crawlers</small></div>
+        </div>
+      </div>
+
+      <div id="status-details"></div>
+    </section>
+
+    <!-- ==================== SEARCH TAB ==================== -->
+    <section id="tab-search" class="tab-content">
+      <div class="card">
+        <h2>Search the Index</h2>
+        <form id="search-form">
+          <div class="form-row search-row">
+            <input type="text" id="search-query" placeholder="Enter search terms..." required>
+            <button type="submit" class="btn-primary">Search</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="search-results" class="card" hidden>
+        <h2>Results <span id="result-count" class="badge"></span></h2>
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>Relevant URL</th>
+              <th>Origin URL</th>
+              <th>Depth</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="pagination" class="pagination"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
