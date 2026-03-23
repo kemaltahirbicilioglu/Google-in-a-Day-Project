@@ -1,0 +1,16 @@
+{
+  "crawler_id": "1774287769_2224",
+  "origin": "https://docs.python.org/3/tutorial/",
+  "max_depth": 5,
+  "status": "finished",
+  "pages_crawled": 501,
+  "queue_depth": 10000,
+  "max_queue_size": 10000,
+  "max_workers": 4,
+  "hit_rate": 2.0,
+  "max_pages": 500,
+  "backpressure_events": 68,
+  "created_at": "2026-03-23T17:42:49.636193+00:00",
+  "started_at": "2026-03-23T17:42:49.666146+00:00",
+  "completed_at": "2026-03-23T17:47:29.629752+00:00"
+}
