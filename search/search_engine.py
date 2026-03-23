@@ -4,6 +4,7 @@ Reads from the shared in-memory IndexStore so results reflect the latest
 crawled data even while indexing is still active.
 """
 
+import math
 import re
 from typing import Any
 
@@ -39,8 +40,11 @@ class SearchEngine:
         if not words:
             return {"query": query, "total": 0, "results": []}
 
+        total_docs = self._index.total_documents
+        df_map = {w: self._index.document_frequency(w) for w in words}
+
         raw_entries = self._index.search(words)
-        scored = self._score_and_dedup(raw_entries, words)
+        scored = self._score_and_dedup(raw_entries, words, total_docs, df_map)
         scored.sort(key=lambda r: r["score"], reverse=True)
 
         total = len(scored)
@@ -65,31 +69,39 @@ class SearchEngine:
     def _score_and_dedup(
         entries: list[IndexEntry],
         query_words: list[str],
+        total_docs: int,
+        df_map: dict[str, int],
     ) -> list[dict[str, Any]]:
-        """Score entries and deduplicate by relevant_url (keep highest score).
+        """Score entries using TF-IDF and deduplicate by relevant_url.
 
-        Scoring formula per entry:
-            base  = frequency * 10
-            bonus = 1000 if the indexed word exactly matches a query word
-                  + (len(matched_query_word) * 50) for prefix matches
-            penalty = depth * 5
-
-            score = base + bonus - penalty
+        Scoring:
+            TF  = 1 + log10(frequency)          (log-scaled term frequency)
+            IDF = log10(total_docs / df)         (inverse document frequency)
+            score = TF * IDF                     (per query term, summed)
+                  + exact match bonus (1.0)
+                  - depth penalty (depth * 0.1)
         """
         best: dict[str, dict[str, Any]] = {}
-
         query_set = set(query_words)
 
         for entry in entries:
-            exact = entry.word in query_set
-            prefix_bonus = 0
-            if not exact:
-                for qw in query_words:
-                    if entry.word.startswith(qw):
-                        prefix_bonus = max(prefix_bonus, len(qw) * 50)
+            tf = 1 + math.log10(max(entry.frequency, 1))
 
-            score = (entry.frequency * 10) + (1000 if exact else prefix_bonus) - (entry.depth * 5)
-            score = max(score, 0)
+            df = df_map.get(entry.word, 1)
+            for qw in query_words:
+                if entry.word.startswith(qw) and qw in df_map:
+                    df = df_map[qw]
+                    break
+            idf = math.log10(total_docs / max(df, 1))
+
+            tfidf = tf * idf
+
+            exact = entry.word in query_set
+            bonus = 1.0 if exact else 0.0
+            penalty = entry.depth * 0.1
+
+            score = round(tfidf + bonus - penalty, 4)
+            score = max(score, 0.0)
 
             url = entry.relevant_url
             if url not in best or score > best[url]["score"]:

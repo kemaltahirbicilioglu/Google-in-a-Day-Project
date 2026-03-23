@@ -250,16 +250,19 @@ On resume (`POST /resume/{crawler_id}`):
 
 ## 9. Search Relevance
 
-Scoring formula per result:
+Scoring uses TF-IDF (Term Frequency -- Inverse Document Frequency):
 ```
-score = (frequency × 10) + (1000 if exact_match) - (depth × 5)
+TF    = 1 + log10(frequency)
+IDF   = log10(total_docs / doc_frequency)
+score = TF * IDF + exact_match_bonus (1.0) - depth_penalty (depth * 0.1)
 ```
 
-- **Term frequency (TF):** Higher word count on a page → higher score.
-- **Depth penalty:** Pages closer to the origin rank higher.
-- **Exact match bonus:** Exact query word matches beat prefix matches.
+- **TF (Term Frequency):** Log-scaled word count on the page — diminishing returns for very high counts.
+- **IDF (Inverse Document Frequency):** Words that appear in fewer documents are more distinctive and score higher.
+- **Exact match bonus:** +1.0 when the indexed word exactly matches a query word.
+- **Depth penalty:** Pages closer to the origin rank slightly higher (-0.1 per depth level).
 - **Deduplication:** Results grouped by `relevant_url`, keeping highest score.
-- **Prefix matching:** For query terms ≥ 3 characters, indexed words starting with the query term are also matched (with lower score).
+- **Prefix matching:** For query terms ≥ 3 characters, indexed words starting with the query term are also matched.
 
 ## 10. UI Requirements
 

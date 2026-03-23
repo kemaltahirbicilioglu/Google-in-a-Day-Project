@@ -116,6 +116,22 @@ class IndexStore:
         with self._lock:
             return len(self._index)
 
+    @property
+    def total_documents(self) -> int:
+        """Count of unique URLs in the index."""
+        with self._lock:
+            urls: set[str] = set()
+            for entries in self._index.values():
+                for e in entries:
+                    urls.add(e.relevant_url)
+            return max(len(urls), 1)
+
+    def document_frequency(self, word: str) -> int:
+        """Number of unique documents that contain the given word."""
+        with self._lock:
+            entries = self._index.get(word, [])
+            return len({e.relevant_url for e in entries})
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
