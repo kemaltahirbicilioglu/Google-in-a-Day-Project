@@ -27,7 +27,7 @@ env/
 Thumbs.db
 
 # Runtime data (auto-created by the crawler)
-data/
+#data/
 
 # Logs
 *.log
